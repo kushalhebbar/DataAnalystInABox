@@ -1,0 +1,30 @@
+{
+  "csv_path": "code/tests/data/delivery_operations_complex.csv",
+  "problem_statement": "We want to understand what factors influence delivery delays in our global logistics operations. Our operations team needs data-driven insights into which operational metrics, regional factors, and carrier choices are most predictive of late deliveries. We need to identify opportunities to improve on-time delivery performance, reduce costs, and optimize carrier partnerships. The analysis should account for weather patterns, vehicle types, plant locations, and customer priorities.",
+  "audience": "Operations Manager, Finance Director, Supply Chain Executive",
+  "goal_type": "analysis",
+  "success_metric": "Identify top 5 factors correlated with delivery delays with statistical confidence. Provide segmented recommendations by region, carrier, and priority level. Quantify impact on operational costs.",
+  "data_dictionary": "delivery_operations_complex.csv contains 205 order records with data quality issues (missing values, outliers, duplicates) to test pipeline robustness. Columns: order_id (identifier), customer_name (categorical, PII-like), customer_email (contact, PII, 10% missing), order_date (temporal), plant (4 plants: A-D), region (5 regions: US East/West, EU Central/West, APAC), carrier (4 carriers: X-Z, W), product_category (Engine, Chassis, Electrical, Interior, Suspension), planned_delivery_days (2-8 days), actual_delivery_days (1-12 days, includes impossible value: -1), units_shipped (50-500, 5% missing), shipping_cost_usd (500-50K with 10x outliers, 3% missing), priority_flag (Low, Medium, High, Critical), weather_delay (0/1/missing), vehicle_type (Truck/Van/Air/Rail, 5% missing), avg_temp_celsius (-10 to 40C), humidity_pct (20-95%, includes impossible value: 150), late_delivery (boolean target, derived from planned vs actual days)",
+  "target_column": "late_delivery",
+  "test_notes": {
+    "stress_test_features": [
+      "200+ rows (vs 10) - tests scalability",
+      "Missing values (60 cells) - tests handling of incomplete data",
+      "5 duplicate rows - tests deduplication logic",
+      "Outliers in shipping_cost (10x multiplier) - tests outlier detection",
+      "Impossible values (negative days, >100% humidity) - tests data validation",
+      "PII-like columns (customer_name, customer_email) - tests PII detection",
+      "Multiple potential targets (weather_delay, late_delivery, priority classification) - tests target scoring",
+      "Mixed data types (numeric, categorical, temporal, boolean) - tests type handling",
+      "High cardinality regions & carriers - tests categorical scaling",
+      "Missing target column values would require user clarification"
+    ],
+    "expected_issues_to_catch": [
+      "Data quality warnings (duplicates, impossible values, high missingness)",
+      "PII flag for customer_name and customer_email",
+      "Multiple target candidates scored (late_delivery should rank highest)",
+      "Sample rows showing outliers and edge cases",
+      "Recommendations for data cleaning before analysis"
+    ]
+  }
+}

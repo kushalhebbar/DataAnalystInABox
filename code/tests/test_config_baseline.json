@@ -1,0 +1,13 @@
+{
+  "csv_path": "code/tests/data/delivery_operations.csv",
+  "problem_statement": "Quick test with clean data. We want to understand delivery performance factors.",
+  "audience": "Operations Analyst",
+  "goal_type": "analysis",
+  "success_metric": "Understand which operational metrics affect delivery delays",
+  "data_dictionary": "Simple delivery operations dataset with 10 clean rows",
+  "target_column": "late_delivery",
+  "test_notes": {
+    "scenario": "baseline_clean_data",
+    "purpose": "Verify pipeline works with minimal, clean data (no stress test)"
+  }
+}

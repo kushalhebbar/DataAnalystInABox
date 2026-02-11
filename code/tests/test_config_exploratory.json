@@ -1,0 +1,14 @@
+{
+  "csv_path": "code/tests/data/delivery_operations_complex.csv",
+  "problem_statement": "We need a quick pilot analysis on delivery performance. What's driving delays?",
+  "audience": "Regional Manager",
+  "goal_type": "unsure",
+  "success_metric": "Get initial insights into delivery performance trends",
+  "data_dictionary": "Complex dataset with PII, missing values, outliers, and data quality issues",
+  "target_column": null,
+  "test_notes": {
+    "scenario": "exploratory_no_target",
+    "purpose": "Test EDA mode without pre-specified target (should suggest multiple candidates)",
+    "expected_behavior": "Identify top target candidates instead of proceeding directly"
+  }
+}
