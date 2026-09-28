@@ -183,12 +183,51 @@ poetry run python code/tests/test_runner.py
 
 ---
 
+## Evaluation
+
+An evaluation harness ([code/evals/](code/evals)) scores the pipeline against
+six labeled datasets (synthetic + the delivery data) with known target columns
+and PII columns.
+
+```bash
+# Fast, deterministic checks (target + PII); no LLM needed
+poetry run python code/evals/run_eval.py
+
+# Also measure insight faithfulness and latency through the full graph
+poetry run python code/evals/run_eval.py --full
+```
+
+**What it measures**
+- **Insight faithfulness** — every number in the generated summary is checked
+  against the evidence the model was actually given, so fabricated statistics are
+  caught rather than trusted.
+- **Target detection** — is the true target column ranked first / within the top 3?
+- **PII detection** — precision / recall / F1 of flagged columns vs. known PII.
+- **Latency** — wall-clock time per dataset.
+
+**Latest run** (`qwen2.5:14b`, 6 datasets):
+
+| Metric | Result |
+|--------|--------|
+| Target detection | 100% top-1, 100% top-3 |
+| PII detection | mean F1 1.00 |
+| Insight faithfulness | 90% of cited numbers grounded in evidence |
+| Latency | ~32s per dataset |
+
+The harness earns its keep: it flagged a false positive in PII detection (ISO
+dates matching the phone-number regex), which is now fixed, and its faithfulness
+check caught the LLM inventing three figures on one dataset that were not in its
+evidence.
+
+---
+
 ## Key Features
 
 - **Full lineage** — Every transformation tracked with before/after snapshots
 - **Decision explanations** — Each decision records a confidence score and a caveat
 - **Automated EDA** — Correlations, target relationships, and charts generated per run
 - **Evidence-grounded insights** — The LLM summary is constrained to computed numbers, not free invention
+- **Evaluation harness** — Faithfulness, target-detection accuracy, and PII precision/recall on labeled datasets
 - **Report export** — One-click PDF and PowerPoint deliverables
 - **Pluggable LLM backend** — Local Ollama by default; switch to OpenAI or Anthropic via `LLM_PROVIDER`
 - **PII detection** — Pattern-based detection with masked samples
