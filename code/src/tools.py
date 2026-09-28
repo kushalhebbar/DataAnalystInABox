@@ -162,7 +162,8 @@ def detect_pii_columns(df: pd.DataFrame, patterns: list[str]) -> list[dict[str, 
     flagged: list[dict[str, Any]] = []
     value_patterns = {
         "email": re.compile(r"[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}", re.IGNORECASE),
-        "phone": re.compile(r"\+?\d[\d\s().-]{7,}\d"),
+        # 3-3-4 grouping so ISO dates (YYYY-MM-DD) are not mistaken for phone numbers
+        "phone": re.compile(r"(?:\+?\d{1,3}[\s.-]?)?\(?\d{3}\)?[\s.-]?\d{3}[\s.-]?\d{4}\b"),
         "ssn": re.compile(r"\b\d{3}-\d{2}-\d{4}\b"),
         "ip": re.compile(r"\b\d{1,3}(?:\.\d{1,3}){3}\b"),
     }
