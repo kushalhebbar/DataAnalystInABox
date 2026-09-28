@@ -10,7 +10,7 @@ GoalType = Literal["analysis", "prediction", "unsure"]
 
 
 class Inputs(BaseModel):
-    dataset_paths: list[str] = Field(default_factory=list)  # Phase 1 uses 1 file
+    dataset_paths: list[str] = Field(default_factory=list)
     problem_statement: str
     audience: str
     goal_type: GoalType
@@ -49,6 +49,34 @@ class Profile(BaseModel):
     numeric_stats: dict[str, dict[str, Any]] = Field(default_factory=dict)
     cardinality: dict[str, Any] = Field(default_factory=dict)
     date_ranges: dict[str, dict[str, Any]] = Field(default_factory=dict)
+
+
+class Chart(BaseModel):
+    title: str
+    path: str
+    kind: str  # histogram, correlation, bar, ...
+    caption: str = ""
+
+
+class Finding(BaseModel):
+    statement: str
+    evidence: str  # concrete numbers backing the statement
+    confidence: float = 0.5
+    caveat: str = ""
+
+
+class EDAResult(BaseModel):
+    charts: list[Chart] = Field(default_factory=list)
+    correlations: list[dict[str, Any]] = Field(default_factory=list)
+    target_relationships: list[dict[str, Any]] = Field(default_factory=list)
+    findings: list[Finding] = Field(default_factory=list)
+
+
+class Insights(BaseModel):
+    headline: str
+    narrative: str
+    recommendations: list[str] = Field(default_factory=list)
+    risks: list[str] = Field(default_factory=list)
 
 
 class LineageSnapshot(BaseModel):
@@ -90,11 +118,13 @@ class RunState(BaseModel):
     internal_questions: list[Question] = Field(default_factory=list)
     improved_problem_statement: Optional[str] = None
     profile: Optional[Profile] = None
+    eda: Optional[EDAResult] = None
+    insights: Optional[Insights] = None
     user_feedback: list[UserFeedback] = Field(default_factory=list)
 
     # Simple audit log (safe, concise)
     audit: list[dict[str, Any]] = Field(default_factory=list)
     lineage: list[LineageEntry] = Field(default_factory=list)
 
-    stage: Literal["init", "intake_done", "profile_done", "failed"] = "init"
+    stage: Literal["init", "intake_done", "profile_done", "eda_done", "insights_done", "failed"] = "init"
     errors: list[str] = Field(default_factory=list)
