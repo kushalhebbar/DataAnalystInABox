@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 
-from ..llm import get_llm
+from ..llm import get_llm, llm_enabled
 from ..state import RunState, Question, LineageEntry, Profile
 from ..tools import read_csv, basic_profile
 from ..logging_config import setup_logging
@@ -11,7 +11,7 @@ logger = setup_logging(name="intake_node")
 
 def intake_node(state: RunState) -> RunState:
     logger.info("Intake node started")
-    llm = get_llm()
+    llm = get_llm() if llm_enabled() else None
     
     # Read and profile dataset
     if not state.inputs.dataset_paths:
@@ -95,7 +95,11 @@ def intake_node(state: RunState) -> RunState:
     ]
     
     logger.info("Calling LLM for question generation...")
-    raw = llm.invoke(msg).strip()
+    if llm is None:
+        logger.info("LLM disabled (LLM_PROVIDER=none); using heuristic fallback")
+        raw = ""
+    else:
+        raw = llm.invoke(msg).strip()
     logger.debug(f"LLM response length: {len(raw)} chars")
 
     try:
