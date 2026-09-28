@@ -70,7 +70,7 @@ def run_test(config_path: str, test_name: str) -> bool:
         if isinstance(output, dict):
             output = RunState(**output)
         
-        logger.info("✓ Pipeline completed successfully")
+        logger.info("Pipeline completed successfully")
         logger.info(f"  Run ID: {output.config.run_id}")
         logger.info(f"  Stage: {output.stage}")
         logger.info(f"  User questions: {len(output.user_questions)}")
@@ -85,7 +85,7 @@ def run_test(config_path: str, test_name: str) -> bool:
         return True
         
     except Exception as e:
-        logger.error(f"✗ Test failed with error: {str(e)}", exc_info=True)
+        logger.error(f"Test failed with error: {str(e)}", exc_info=True)
         return False
 
 
@@ -119,7 +119,7 @@ def main():
     logger.info(f"{'='*60}")
     
     for test_name, passed in results.items():
-        status = "✓ PASS" if passed else "✗ FAIL"
+        status = "PASS" if passed else "FAIL"
         logger.info(f"{status}: {test_name}")
     
     total = len(results)
@@ -128,10 +128,10 @@ def main():
     logger.info(f"\nTotal: {passed_count}/{total} tests passed")
     
     if passed_count == total:
-        logger.info("\n✓✓✓ ALL TESTS PASSED ✓✓✓")
+        logger.info("\nAll tests passed")
         return 0
     else:
-        logger.error(f"\n✗✗✗ {total - passed_count} TEST(S) FAILED ✗✗✗")
+        logger.error(f"\n{total - passed_count} test(s) failed")
         return 1
 
 
