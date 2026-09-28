@@ -191,3 +191,67 @@ def detect_pii_columns(df: pd.DataFrame, patterns: list[str]) -> list[dict[str, 
             )
 
     return flagged
+
+
+def top_correlations(df: pd.DataFrame, threshold: float = 0.3, limit: int = 10) -> list[dict[str, Any]]:
+    """Strongest linear relationships between numeric columns, ranked by |r|."""
+    numeric = df.select_dtypes(include=[np.number])
+    if numeric.shape[1] < 2:
+        return []
+
+    corr = numeric.corr(numeric_only=True)
+    pairs = []
+    cols = list(corr.columns)
+    for i in range(len(cols)):
+        for j in range(i + 1, len(cols)):
+            r = corr.iloc[i, j]
+            if pd.isna(r) or abs(r) < threshold:
+                continue
+            pairs.append({"x": cols[i], "y": cols[j], "r": round(float(r), 3)})
+
+    pairs.sort(key=lambda p: abs(p["r"]), reverse=True)
+    return pairs[:limit]
+
+
+def target_relationships(df: pd.DataFrame, target: str, limit: int = 8) -> list[dict[str, Any]]:
+    """How each feature relates to the target.
+
+    Numeric target -> Pearson correlation with numeric features.
+    Categorical/binary target -> per-group mean of numeric features, reported as spread.
+    """
+    if target not in df.columns:
+        return []
+
+    results: list[dict[str, Any]] = []
+    target_series = df[target]
+    is_numeric_target = pd.api.types.is_numeric_dtype(target_series) and target_series.nunique(dropna=True) > 2
+
+    features = [c for c in df.columns if c != target]
+    if is_numeric_target:
+        for col in features:
+            if not pd.api.types.is_numeric_dtype(df[col]):
+                continue
+            r = df[[col, target]].corr(numeric_only=True).iloc[0, 1]
+            if pd.isna(r):
+                continue
+            results.append({"feature": col, "type": "correlation", "value": round(float(r), 3)})
+        results.sort(key=lambda x: abs(x["value"]), reverse=True)
+    else:
+        for col in features:
+            if not pd.api.types.is_numeric_dtype(df[col]):
+                continue
+            grouped = df.groupby(target, dropna=True)[col].mean()
+            if grouped.empty or grouped.isna().all():
+                continue
+            spread = float(grouped.max() - grouped.min())
+            results.append(
+                {
+                    "feature": col,
+                    "type": "group_means",
+                    "value": round(spread, 3),
+                    "by_group": {str(k): round(float(v), 3) for k, v in grouped.dropna().items()},
+                }
+            )
+        results.sort(key=lambda x: x["value"], reverse=True)
+
+    return results[:limit]
