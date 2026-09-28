@@ -7,10 +7,12 @@ __pycache__/
 *$py.class
 .pytest_cache/
 
-# Data/artifacts outputs
+# Data / run outputs
 data/
 artifacts/
 logs/
+graph_visualization.png
+TEST_RESULTS.md
 
-# AI-generated scripts (optional - can track if useful)
-# .github/ai_scripts/
+# OS
+.DS_Store
