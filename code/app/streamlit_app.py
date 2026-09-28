@@ -1,6 +1,5 @@
 import sys
 from pathlib import Path
-from datetime import datetime, timezone
 
 import streamlit as st
 import tempfile
@@ -12,79 +11,28 @@ sys.path.insert(0, str(ROOT / "code"))
 
 from src.state import Inputs, RunState
 from src.graph import build_graph
-from src.tools import read_csv, basic_profile
+from src.report import build_pdf, build_pptx
 from src.logging_config import setup_logging
 
 logger = setup_logging(log_dir=str(ROOT / "logs"), name="streamlit_app")
 logger.info("Streamlit app started")
 
 
-def generate_test_results(artifacts_root: Path, output_path: Path) -> None:
-    runs = []
-    for state_path in artifacts_root.glob("*/state.json"):
+def _promote_secrets_to_env() -> None:
+    """Mirror deploy-time secrets into os.environ so get_llm() and TEST_CONFIG work on Streamlit Cloud."""
+    for key in ("LLM_PROVIDER", "LLM_MODEL", "OPENAI_API_KEY", "ANTHROPIC_API_KEY", "TEST_CONFIG"):
         try:
-            with open(state_path, "r", encoding="utf-8") as f:
-                data = json.load(f)
-            state = RunState(**data)
-            runs.append(
-                {
-                    "run_id": state.config.run_id,
-                    "created_at": state.config.created_at,
-                    "dataset": (state.inputs.dataset_paths or [""])[0],
-                    "target": state.inputs.target_column or "(none)",
-                    "stage": state.stage,
-                    "user_questions": len(state.user_questions),
-                    "internal_questions": len(state.internal_questions),
-                    "audit_entries": len(state.audit),
-                    "errors": state.errors,
-                    "state_path": str(state_path),
-                }
-            )
-        except Exception as e:
-            logger.warning(f"Failed to parse artifact {state_path}: {e}")
+            if key in st.secrets and key not in os.environ:
+                os.environ[key] = str(st.secrets[key])
+        except Exception:
+            break
 
-    runs.sort(key=lambda r: r.get("created_at") or "")
 
-    total = len(runs)
-    passed = sum(1 for r in runs if not r["errors"])
-    now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
+_promote_secrets_to_env()
 
-    lines = [
-        "# Test Results",
-        "",
-        f"Generated: {now}",
-        f"Total runs: {total}",
-        f"Passed: {passed}",
-        f"Failed: {total - passed}",
-        "",
-        "## Runs",
-    ]
-
-    for r in runs:
-        status = "PASS" if not r["errors"] else "FAIL"
-        created = r.get("created_at") or "(unknown)"
-        lines.extend(
-            [
-                "",
-                f"### {status} — Run ID {r['run_id']}",
-                f"- Created: {created}",
-                f"- Dataset: {r['dataset']}",
-                f"- Target: {r['target']}",
-                f"- Stage: {r['stage']}",
-                f"- User questions: {r['user_questions']}",
-                f"- Internal questions: {r['internal_questions']}",
-                f"- Audit entries: {r['audit_entries']}",
-                f"- Artifact: {r['state_path']}",
-            ]
-        )
-        if r["errors"]:
-            lines.append(f"- Errors: {r['errors']}")
-
-    output_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
-    logger.info(f"Test results written to: {output_path}")
 
 st.set_page_config(page_title="Analyst-in-a-Box", layout="wide")
-st.title("Analyst-in-a-Box (Phase 1: Intake + Profiling)")
+st.title("Analyst-in-a-Box")
 
 # Initialize session state with defaults
 if "test_mode" not in st.session_state:
@@ -107,7 +55,7 @@ if "test_mode" not in st.session_state:
 
 # File upload (skipped in test mode)
 if st.session_state.test_mode:
-    st.info(f"🧪 Test mode: using {st.session_state.uploaded_path}")
+    st.info(f"Test mode: using {st.session_state.uploaded_path}")
     uploaded = None
 else:
     uploaded = st.file_uploader("Upload dataset (CSV)", type=["csv"])
@@ -150,7 +98,7 @@ target_column = st.text_input(
 )
 
 run_btn = st.button(
-    "Run Phase 1",
+    "Run analysis",
     type="primary",
     disabled=(
         (uploaded is None and not st.session_state.test_mode)
@@ -231,7 +179,7 @@ if run_btn:
                     conf_str = f" (confidence: {int(confidence*100)}%)" if confidence is not None else ""
                     explainability_lines.append(f"│  ├─ {decision_name}{conf_str}")
                     if caveat:
-                        explainability_lines.append(f"│  │  └─ 💡 {caveat}")
+                        explainability_lines.append(f"│  │  └─ {caveat}")
                     for k, v in d.items():
                         if k not in ['decision', 'confidence', 'caveat']:
                             explainability_lines.append(f"│  │     {k}: {v}")
@@ -247,23 +195,17 @@ if run_btn:
             f.write("\n".join(explainability_lines))
         logger.info("Explainability log saved")
 
-        if st.session_state.test_mode:
-            generate_test_results(
-                artifacts_root=ROOT / "artifacts",
-                output_path=ROOT / "TEST_RESULTS.md",
-            )
-
 # Display results (from current run or session_state)
 if 'last_run_result' in st.session_state:
     out = st.session_state.last_run_result
     run_id = out.config.run_id
     out_dir = os.path.join("artifacts", run_id)
     
-    st.success(f"✅ Analysis Complete — Run ID: {run_id}")
-    st.caption(f"📁 Artifacts: `{out_dir}/`")
+    st.success(f"Analysis complete — Run ID: {run_id}")
+    st.caption(f"Artifacts: `{out_dir}/`")
     
     # Clear results button
-    if st.button("🗑️ Clear Results & Start New Analysis"):
+    if st.button("Clear results & start new analysis"):
         st.session_state.clear()
         st.rerun()
     
@@ -274,17 +216,17 @@ if 'last_run_result' in st.session_state:
             state_path = os.path.join(out_dir, "state.json")
             if os.path.exists(state_path):
                 with open(state_path, "r") as f:
-                    st.download_button("⬇️ Download state.json", f.read(), f"{run_id}_state.json", "application/json")
+                    st.download_button("Download state.json", f.read(), f"{run_id}_state.json", "application/json")
         with col_dl2:
             log_path = os.path.join(out_dir, "explainability.log")
             if os.path.exists(log_path):
                 with open(log_path, "r") as f:
-                    st.download_button("⬇️ Download explainability.log", f.read(), f"{run_id}_explainability.log", "text/plain")
+                    st.download_button("Download explainability.log", f.read(), f"{run_id}_explainability.log", "text/plain")
     
     st.divider()
     
     # === SUMMARY DASHBOARD ===
-    st.subheader("📊 Summary")
+    st.subheader("Summary")
     metric_cols = st.columns(5)
     metric_cols[0].metric("Rows Processed", out.profile.rows if out.profile else 0)
     metric_cols[1].metric("Columns", out.profile.cols if out.profile else 0)
@@ -305,17 +247,68 @@ if 'last_run_result' in st.session_state:
             if "missing" in decision.get("decision", "").lower():
                 quality_issues += decision.get("rows_affected", 0)
     
-    metric_cols[2].metric("PII Columns", pii_count, delta="⚠️" if pii_count > 0 else None)
-    metric_cols[3].metric("Quality Issues", quality_issues, delta="⚠️" if quality_issues > 0 else None)
+    metric_cols[2].metric("PII Columns", pii_count, delta="review" if pii_count > 0 else None)
+    metric_cols[3].metric("Quality Issues", quality_issues, delta="review" if quality_issues > 0 else None)
     
     if avg_confidence:
         avg_conf_pct = int(sum(avg_confidence) / len(avg_confidence) * 100)
         metric_cols[4].metric("Avg Confidence", f"{avg_conf_pct}%")
     
     st.divider()
-    
+
+    # === EXECUTIVE SUMMARY & INSIGHTS ===
+    if out.insights:
+        st.subheader("Executive Summary")
+        st.markdown(f"**{out.insights.headline}**")
+        st.write(out.insights.narrative)
+        ins_cols = st.columns(2)
+        with ins_cols[0]:
+            if out.insights.recommendations:
+                st.markdown("**Recommendations**")
+                for rec in out.insights.recommendations:
+                    st.markdown(f"- {rec}")
+        with ins_cols[1]:
+            if out.insights.risks:
+                st.markdown("**Risks & Caveats**")
+                for risk in out.insights.risks:
+                    st.markdown(f"- {risk}")
+        st.divider()
+
+    # === EDA: CHARTS & FINDINGS ===
+    if out.eda:
+        st.subheader("Exploratory Analysis")
+        if out.eda.findings:
+            for f in out.eda.findings:
+                st.markdown(f"- {f.statement}  \n  <span style='color:gray'>{f.evidence} · {int(f.confidence*100)}% confidence · {f.caveat}</span>", unsafe_allow_html=True)
+        if out.eda.charts:
+            chart_cols = st.columns(2)
+            for i, chart in enumerate(out.eda.charts):
+                if os.path.exists(chart.path):
+                    with chart_cols[i % 2]:
+                        st.image(chart.path, caption=chart.caption or chart.title, width="stretch")
+
+        # Report export
+        st.markdown("**Export report**")
+        rep_cols = st.columns(2)
+        with rep_cols[0]:
+            if st.button("Generate PDF", key="gen_pdf"):
+                pdf_path = build_pdf(out)
+                with open(pdf_path, "rb") as f:
+                    st.download_button("Download PDF", f.read(), f"{run_id}_report.pdf", "application/pdf")
+        with rep_cols[1]:
+            if st.button("Generate PPTX", key="gen_pptx"):
+                pptx_path = build_pptx(out)
+                with open(pptx_path, "rb") as f:
+                    st.download_button(
+                        "Download PPTX",
+                        f.read(),
+                        f"{run_id}_report.pptx",
+                        "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+                    )
+        st.divider()
+
     # === DATA JOURNEY (LINEAGE) ===
-    st.subheader("🔍 Data Journey & Transparency")
+    st.subheader("Data Journey & Transparency")
     if not out.lineage:
         st.info("No lineage entries yet.")
     else:
@@ -338,7 +331,7 @@ if 'last_run_result' in st.session_state:
                         
                         # Data diff viewer
                         if entry.input and (entry.input.rows != entry.output.rows or entry.input.cols != entry.output.cols):
-                            st.markdown("**⚠️ Data Changed**")
+                            st.markdown("**Data Changed**")
                             diff_col1, diff_col2 = st.columns(2)
                             diff_col1.metric("Rows changed", entry.output.rows - entry.input.rows, delta=entry.output.rows - entry.input.rows)
                             diff_col2.metric("Cols changed", entry.output.cols - entry.input.cols, delta=entry.output.cols - entry.input.cols)
@@ -359,16 +352,16 @@ if 'last_run_result' in st.session_state:
                                 if confidence is not None:
                                     conf_pct = int(confidence * 100)
                                     if confidence >= 0.8:
-                                        dec_cols[1].success(f"✓ {conf_pct}% confident")
+                                        dec_cols[1].success(f"{conf_pct}% confident")
                                     elif confidence >= 0.5:
-                                        dec_cols[1].warning(f"⚠ {conf_pct}% confident")
+                                        dec_cols[1].warning(f"{conf_pct}% confident")
                                     else:
-                                        dec_cols[1].error(f"⚠️ {conf_pct}% confident")
+                                        dec_cols[1].error(f"{conf_pct}% confident")
                                 
                                 # Caveat
                                 caveat = decision.get('caveat')
                                 if caveat:
-                                    dec_cols[2].caption(f"💡 {caveat}")
+                                    dec_cols[2].caption(f"{caveat}")
                                 
                                 # Decision details
                                 detail_items = {k: v for k, v in decision.items() if k not in ['decision', 'confidence', 'caveat']}
@@ -383,7 +376,7 @@ if 'last_run_result' in st.session_state:
                                             decision_type = decision.get('decision', '')
                                             if decision_type in ['outliers_detected', 'duplicates_detected']:
                                                 st.markdown("---")
-                                                st.markdown("**🔄 Provide Feedback**")
+                                                st.markdown("**Provide Feedback**")
                                                 
                                                 feedback_key = f"feedback_{entry.node}_{dec_idx}"
                                                 
@@ -409,12 +402,12 @@ if 'last_run_result' in st.session_state:
                                                             "reason": reason,
                                                             "count": decision.get('count') or decision.get('rows_affected', 0),
                                                         }
-                                                        st.success("✓ Feedback saved!")
+                                                        st.success("Feedback saved.")
                                                 
                                                 # Show if feedback already stored
                                                 if f"stored_{feedback_key}" in st.session_state:
                                                     stored = st.session_state[f"stored_{feedback_key}"]
-                                                    st.info(f"✓ Feedback stored: {stored['reason']}")
+                                                    st.info(f"Feedback stored: {stored['reason']}")
                                             
                                             detail_items = {k: v for k, v in detail_items.items() if k != 'examples'}
                                         
@@ -428,7 +421,7 @@ if 'last_run_result' in st.session_state:
     st.divider()
     
     # === QUESTIONS FOR USER ===
-    st.subheader("❓ Questions for You (Clarifications)")
+    st.subheader("Questions for You (Clarifications)")
     if out.user_questions:
         # Use hash of question text as stable key (not index)
         import hashlib
@@ -439,8 +432,8 @@ if 'last_run_result' in st.session_state:
             answers = {}  # Maps question text -> answer
             for i, q in enumerate(out.user_questions, 1):
                 q_key = question_key(q.question)
-                priority_icon = "🔴" if q.priority == "high" else "🟡" if q.priority == "medium" else "🟢"
-                st.markdown(f"**{priority_icon} {i}. {q.question}**")
+                priority_tag = q.priority.upper()
+                st.markdown(f"**{i}. {q.question}** _[{priority_tag}]_")
                 st.caption(f"Why: {q.why}")
                 answers[q.question] = st.text_area(
                     f"Answer {i}",
@@ -451,7 +444,7 @@ if 'last_run_result' in st.session_state:
                 )
                 st.markdown("---")
             
-            submitted = st.form_submit_button("💾 Save Answers", type="primary")
+            submitted = st.form_submit_button("Save Answers", type="primary")
             
             if submitted:
                 saved_count = 0
@@ -464,21 +457,21 @@ if 'last_run_result' in st.session_state:
                         }
                         saved_count += 1
                 if saved_count > 0:
-                    st.success(f"✓ {saved_count} answer(s) saved!")
+                    st.success(f"{saved_count} answer(s) saved.")
                 else:
                     st.warning("No answers provided.")
         
         # Show saved answers
         saved_answers = {k: v for k, v in st.session_state.items() if k.startswith("clarification_answer_")}
         if saved_answers:
-            st.info(f"📝 {len(saved_answers)} answer(s) saved for this session.")
+            st.info(f"{len(saved_answers)} answer(s) saved for this session.")
     else:
         st.info("No clarification questions generated.")
     
     st.divider()
     
     # === RE-RUN WITH FEEDBACK ===
-    st.subheader("🔄 Re-run Analysis with Your Feedback")
+    st.subheader("Re-run Analysis with Your Feedback")
     
     # Collect all feedback from session state
     collected_feedback = []
@@ -501,7 +494,7 @@ if 'last_run_result' in st.session_state:
     
     if has_feedback:
         if collected_feedback:
-            st.info(f"📝 {len(collected_feedback)} quality feedback item(s) collected.")
+            st.info(f"{len(collected_feedback)} quality feedback item(s) collected.")
             for fb in collected_feedback:
                 st.caption(f"• {fb['node']}: {fb['decision_type']} — {fb.get('reason', 'No reason provided')}")
         if collected_answers:
@@ -511,7 +504,7 @@ if 'last_run_result' in st.session_state:
                 ans_preview = ans[:50] + "..." if len(ans) > 50 else ans
                 st.caption(f"• {q_preview}: {ans_preview}")
         
-        if st.button("🔄 Re-run Pipeline with Feedback", type="primary"):
+        if st.button("Re-run Pipeline with Feedback", type="primary"):
             with st.spinner("Re-running analysis with your corrections..."):
                 # Import here to avoid circular dependency
                 from src.state import UserFeedback
@@ -597,28 +590,28 @@ if 'last_run_result' in st.session_state:
                     if key.startswith("stored_feedback_") or key.startswith("clarification_answer_"):
                         del st.session_state[key]
                 
-                st.success(f"✅ Re-run complete! New Run ID: {rerun_id}")
+                st.success(f"Re-run complete. New Run ID: {rerun_id}")
                 st.rerun()
     else:
-        st.info("💡 No feedback provided yet. Answer clarification questions above or expand decision details to provide corrections.")
+        st.info("No feedback provided yet. Answer clarification questions above or expand decision details to provide corrections.")
     
     st.divider()
     
     # === IMPROVED PROBLEM STATEMENT ===
-    with st.expander("📝 Improved Problem Statement", expanded=False):
+    with st.expander("Improved Problem Statement", expanded=False):
         st.write(out.improved_problem_statement or "No improvements suggested.")
     
     # === RAW DATA (COLLAPSED) ===
-    with st.expander("🔧 Internal Questions (Planning)", expanded=False):
+    with st.expander("Internal Questions (Planning)", expanded=False):
         st.json([q.model_dump() for q in out.internal_questions])
     
-    with st.expander("📊 Raw Data Profile", expanded=False):
+    with st.expander("Raw Data Profile", expanded=False):
         if out.profile:
             st.json(out.profile.model_dump())
         else:
             st.warning("No profile generated.")
     
-    with st.expander("📜 Audit Log", expanded=False):
+    with st.expander("Audit Log", expanded=False):
         st.json(out.audit)
     
     # cleanup temp file
