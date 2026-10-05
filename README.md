@@ -4,6 +4,8 @@
 
 Autonomous data analysis agent that mimics a senior analyst's workflow: it profiles a dataset, asks clarifying questions, runs exploratory analysis, and writes an evidence-grounded summary — recording the reasoning and confidence behind every step.
 
+![Demo](docs/demo.gif)
+
 ## Live Demo
 
 [![Open in Streamlit](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://share.streamlit.io/deploy?repository=kushalhebbar/DataAnalystAgentFramework&branch=main&mainModule=code/app/streamlit_app.py)
