@@ -1,0 +1,11 @@
+order_id,plant,region,carrier,product_category,order_date,ship_date,delivery_date,planned_delivery_days,actual_delivery_days,units_shipped,shipping_cost_usd,priority_flag,late_delivery
+10001,Plant_A,US_East,Carrier_X,Engine,2024-01-03,2024-01-04,2024-01-09,4,5,120,1850.50,High,1
+10002,Plant_A,US_East,Carrier_Y,Chassis,2024-01-04,2024-01-05,2024-01-08,3,3,80,1240.00,Low,0
+10003,Plant_B,US_West,Carrier_X,Electrical,2024-01-05,2024-01-06,2024-01-12,5,6,200,3100.75,High,1
+10004,Plant_C,EU_Central,Carrier_Z,Interior,2024-01-06,2024-01-07,2024-01-10,4,3,60,980.00,Low,0
+10005,Plant_B,US_West,Carrier_Y,Engine,2024-01-07,2024-01-08,2024-01-15,5,7,150,2650.25,High,1
+10006,Plant_A,US_East,Carrier_X,Electrical,2024-01-08,2024-01-09,2024-01-13,4,4,90,1425.00,Low,0
+10007,Plant_C,EU_Central,Carrier_Z,Chassis,2024-01-09,2024-01-10,2024-01-14,4,4,110,1680.80,Medium,0
+10008,Plant_B,US_West,Carrier_X,Interior,2024-01-10,2024-01-11,2024-01-18,5,7,70,1120.40,High,1
+10009,Plant_A,US_East,Carrier_Y,Engine,2024-01-11,2024-01-12,2024-01-16,4,4,130,1925.60,Medium,0
+10010,Plant_C,EU_Central,Carrier_Z,Electrical,2024-01-12,2024-01-13,2024-01-19,5,6,95,1505.30,High,1

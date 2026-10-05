@@ -15,5 +15,9 @@ graph_visualization.png
 TEST_RESULTS.md
 evals/results/
 
+# Keep committed test fixtures (needed by CI) despite the data/ rule above
+!code/tests/data/
+!code/tests/data/**
+
 # OS
 .DS_Store
